@@ -1,0 +1,234 @@
+# Cartoonify an Image Using Deep Learning
+# Step 1: Import Libraries
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+import torchvision.transforms as transforms
+from torchvision import datasets
+from torchvision.models import vgg19
+from torchvision.utils import save_image
+from PIL import Image
+import subprocess
+
+# Step 1.1: Install torchmetrics and torch-fidelity (if not installed)
+try:
+    from torchmetrics.image.fid import FrechetInceptionDistance
+except ImportError:
+    subprocess.check_call(["python", "-m", "pip", "install", "torchmetrics[image]"])
+    subprocess.check_call(["python", "-m", "pip", "install", "torch-fidelity"])
+    from torchmetrics.image.fid import FrechetInceptionDistance
+
+# Step 2: Dataset Preparation
+class CartoonDataset(Dataset):
+    def __init__(self, image_path, transform=None):
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"The specified path does not exist: {image_path}")
+        self.image_path = image_path
+        self.image_list = os.listdir(image_path)
+        if len(self.image_list) == 0:
+            raise ValueError(f"No images found in the specified path: {image_path}")
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_list)
+
+    def __getitem__(self, idx):
+        img_path = os.path.join(self.image_path, self.image_list[idx])
+        image = Image.open(img_path).convert('RGB')
+        if self.transform:
+            image = self.transform(image)
+        return image
+
+# Step 3: Data Augmentation and DataLoader
+transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+])
+
+# Assume we have directories './data/real' and './data/cartoon'
+real_image_path = './data/real'
+cartoon_image_path = './data/cartoon'
+
+# Create the directories if they don't exist
+os.makedirs(real_image_path, exist_ok=True)
+os.makedirs(cartoon_image_path, exist_ok=True)
+
+try:
+    dataset_real = CartoonDataset(real_image_path, transform=transform)
+    dataset_cartoon = CartoonDataset(cartoon_image_path, transform=transform)
+except ValueError as e:
+    print(e)
+    exit()
+
+dataloader_real = DataLoader(dataset_real, batch_size=3, shuffle=True)
+dataloader_cartoon = DataLoader(dataset_cartoon, batch_size=3, shuffle=True)
+
+# Step 4: Define Generator and Discriminator Networks
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels):
+        super(ResidualBlock, self).__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1),
+            nn.InstanceNorm2d(in_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1),
+            nn.InstanceNorm2d(in_channels)
+        )
+    
+    def forward(self, x):
+        return x + self.block(x)
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.initial = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3),
+            nn.InstanceNorm2d(64),
+            nn.ReLU(inplace=True)
+        )
+        
+        self.downsampling = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm2d(256),
+            nn.ReLU(inplace=True)
+        )
+        
+        self.residual_blocks = nn.Sequential(
+            *[ResidualBlock(256) for _ in range(9)]
+        )
+        
+        self.upsampling = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.InstanceNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.InstanceNorm2d(64),
+            nn.ReLU(inplace=True)
+        )
+        
+        self.output_layer = nn.Sequential(
+            nn.Conv2d(64, 3, kernel_size=7, stride=1, padding=3),
+            nn.Tanh()
+        )
+    
+    def forward(self, x):
+        x = self.initial(x)
+        x = self.downsampling(x)
+        x = self.residual_blocks(x)
+        x = self.upsampling(x)
+        return self.output_layer(x)
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        # Add layers as per CycleGAN/Pix2Pix discriminator
+        self.model = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=4, stride=2, padding=1),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(128),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(256),
+            nn.LeakyReLU(0.2, True),
+            nn.Conv2d(256, 1, kernel_size=4, stride=1, padding=1),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        return self.model(x)
+
+# Step 5: Initialize Networks
+G = Generator()
+D = Discriminator()
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+G = G.to(device)
+D = D.to(device)
+
+# Step 6: Define Loss Functions and Optimizers
+adversarial_loss = nn.MSELoss()
+content_loss = nn.L1Loss()
+
+optimizer_G = optim.Adam(G.parameters(), lr=0.0001, betas=(0.5, 0.999))
+optimizer_D = optim.Adam(D.parameters(), lr=0.0001, betas=(0.5, 0.999))
+
+# Step 7: Training Loop
+num_epochs = 50
+content_loss_weight = 10
+for epoch in range(num_epochs):
+    for i, (real_images, cartoon_images) in enumerate(zip(dataloader_real, dataloader_cartoon)):
+        real_images = real_images.to(device)
+        cartoon_images = cartoon_images.to(device)
+
+        # Train Generator
+        optimizer_G.zero_grad()
+        generated_images = G(real_images)
+        
+        g_loss_adv = adversarial_loss(D(generated_images), torch.ones_like(D(generated_images)))
+        g_loss_content = content_loss(generated_images, real_images)
+        g_loss = g_loss_adv + content_loss_weight * g_loss_content
+        
+        g_loss.backward()
+        optimizer_G.step()
+
+        # Train Discriminator
+        optimizer_D.zero_grad()
+        real_loss = adversarial_loss(D(cartoon_images), torch.ones_like(D(cartoon_images)))
+        fake_loss = adversarial_loss(D(generated_images.detach()), torch.zeros_like(D(generated_images)))
+        d_loss = (real_loss + fake_loss) / 2
+        
+        d_loss.backward()
+        optimizer_D.step()
+
+        if i % 10 == 0:
+            print(f"Epoch [{epoch}/{num_epochs}] Batch [{i}] Loss D: {d_loss.item()}, Loss G: {g_loss.item()}")
+
+# Step 8: Evaluation with FID Score
+fid = FrechetInceptionDistance(feature=2048).to(device)
+
+real_images_for_fid = next(iter(dataloader_real)).to(device)
+generated_images_for_fid = G(real_images_for_fid).detach()
+
+# Convert images to uint8 for FID calculation
+real_images_for_fid_uint8 = (real_images_for_fid * 255).clamp(0, 255).byte()
+generated_images_for_fid_uint8 = (generated_images_for_fid * 255).clamp(0, 255).byte()
+
+fid.update(real_images_for_fid_uint8, real=True)
+fid.update(generated_images_for_fid_uint8, real=False)
+
+fid_score = fid.compute()
+print(f"FID Score: {fid_score}")
+
+# Step 9: Post-Processing (Optional)
+os.makedirs('output', exist_ok=True)
+generated_images = generated_images[:3]  # Limit to the number of available generated images
+for i in range(len(generated_images)):
+    img = generated_images[i].cpu().detach()
+    img = (img + 1) / 2  # De-normalize
+    save_image(img, f'output/cartoon_{i}.png')
+
+# Step 10: User Interface using Gradio (Optional)
+import gradio as gr
+
+def cartoonify_image(input_image):
+    # Convert NumPy array to PIL image if needed
+    if isinstance(input_image, np.ndarray):
+        input_image = Image.fromarray(input_image)
+    input_tensor = transform(input_image).unsqueeze(0).to(device)
+    output_tensor = G(input_tensor).cpu().detach().squeeze()
+    output_image = transforms.ToPILImage()(output_tensor)
+    return output_image
+
+iface = gr.Interface(fn=cartoonify_image, inputs="image", outputs="image")
+iface.launch()
