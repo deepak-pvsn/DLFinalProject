@@ -1,5 +1,5 @@
-### **Cartoonify an Image Using Deep Learning:
-### **Overview
+### Cartoonify an Image Using Deep Learning:
+### Overview
 This project uses a CycleGAN (Cycle-Consistent Generative Adversarial Network) to transform real-world images into cartoon-style images and reconstruct the original images from cartoonified ones. The project focuses on unpaired image-to-image translation, making it applicable in scenarios where paired datasets are unavailable.
 ### **Key Applications
 •	Animation and movie production.
