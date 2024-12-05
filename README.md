@@ -9,10 +9,8 @@ ________________________________________
 ### Links
 ### •	Colab Notebook: 
     https://colab.research.google.com/drive/1XSke06UeqpXiNxBp_gf1X_LMKjs2GsNz?usp=sharing
-### •	GitHub Repository: 
-    https://github.com/deepak-pvsn/DLFinalProject
 ### •	Demo Video:
-    https://drive.google.com/file/d/1f4Jf3_jHon5e7YQOzUf3NNc6mcIO7ifq/view?usp=drive_link________________________________________
+    https://drive.google.com/file/d/1f4Jf3_jHon5e7YQOzUf3NNc6mcIO7ifq/view?usp=drive_link
 
 ### Dataset
 1.	Real Images: 1000 images from the CelebA dataset.
