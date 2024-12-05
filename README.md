@@ -37,12 +37,9 @@ o	Real images → Cartoonified images → Reconstructed real images.
 2.	Backward Pass: 
 o	Cartoon images → Fake real images → Reconstructed cartoon images.
 ### Loss Functions
-### 1.	Adversarial Loss:
-     Ensures the generated images are indistinguishable from real ones.
-### 2.	Cycle Consistency Loss: 
-    Preserves input structure by reconstructing the original image after transformations.
-### 3.	Identity Loss:
-    Ensures images already in the target domain remain unchanged.
+### 1.	Adversarial Loss: Ensures the generated images are indistinguishable from real ones.
+### 2.	Cycle Consistency Loss: Preserves input structure by reconstructing the original image after transformations.
+### 3.	Identity Loss: Ensures images already in the target domain remain unchanged.
 ________________________________________
 ### Model Architecture
 ![Model Architecture](modelarchitechture.png)
