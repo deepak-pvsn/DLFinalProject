@@ -48,15 +48,11 @@ ________________________________________
 ![Model Architecture](modelarchitechture.png)
 
 ### Implementation
-
 ### Framework: TensorFlow and Keras.
 ### Training Hyperparameters:
-### • Epochs: 
-    75
-### • Batch Size:
-    1
-### • LAMBDA: 
-    100 (Cycle Consistency Loss Weight)
+### • Epochs: 75
+### • Batch Size:1
+### • LAMBDA: 100 (Cycle Consistency Loss Weight)
 ### Evaluation Metrics:
 ### 1.	Structural Similarity Index (SSIM): 
 o	Measures similarity between real and reconstructed images.
@@ -84,9 +80,8 @@ ________________________________________
 ________________________________________
 ### How to Run
 Follow these steps to run the project:
-### 1.Clone the Repository:
-        git clone: https://github.com/deepak-pvsn/DLFinalProject
-        cd DLFinalProject
+### 1.Clone the Repository:git clone: https://github.com/deepak-pvsn/DLFinalProject
+cd DLFinalProject
 ### 2.Set Up the Environment:
 o	Install the required dependencies: 
 o	pip install tensorflow matplotlib
