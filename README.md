@@ -47,8 +47,6 @@ ________________________________________
 ### Model Architecture
 ![Model Architecture](modelarchitechture.png)
 
-<img src="modelarchitechture.png" alt="Model Architecture" width="400">
-
 ### Implementation
 
 ### Framework: TensorFlow and Keras.
@@ -104,5 +102,4 @@ o	Training progress will be displayed epoch by epoch in the terminal.
 o	Sample outputs (real, cartoonified, and reconstructed images) will be displayed after each epoch.
 ### Output We got:
 ![Model Architecture](output.png)
-<img src="output.png" alt="Model Architecture" width="400">
 
